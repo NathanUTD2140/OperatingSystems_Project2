@@ -127,3 +127,103 @@ def teller_thread(tid):
 
         if not bank_open:
             break #otherwise just break out
+
+
+# Customer thread
+def customer_thread(cid):
+    txn = customerTransactions[cid]
+
+    # Customer arrival delay
+    time.sleep(random.uniform(0.0, 0.1))
+
+    # 3 steop intro like in sample
+    log(f"Customer {cid} []: going to bank.") 
+    door.acquire() #wait for door to let in only 2 at a time
+    log(f"Customer {cid} []: entering bank.")
+    log(f"Customer {cid} []: getting in line.")
+
+    with queueLock:
+        customerQueue.append(cid) # Add in the customer id to queue
+
+    chosen_teller = None
+
+    while True:
+        with queueLock:
+            if customerQueue[0] == cid:
+                for t in range(NumberOfTellers):
+                    if tellerAvailable[t].acquire(blocking=False): # they can go to the first teller 
+                        chosen_teller = t #
+                        assignedTeller[cid] = t #assigns the teller to them
+                        customerQueue.pop(0) #pop the customer from the queue
+                        break
+            if chosen_teller is not None:
+                break
+
+        time.sleep(0.001) #rest between
+
+    # Logging the teller
+    log(f"Customer {cid} []: selecting a teller.")
+    log(f"Customer {cid} [Teller {chosen_teller}]: selects teller")
+    log(f"Customer {cid} [Teller {chosen_teller}]: introduces itself")
+
+    # Wake up the teller by releasing it
+    tellerWaiting[chosen_teller].release()
+
+    # Give transaction cusotomer wants
+    log(f"Customer {cid} [Teller {chosen_teller}]: asks for {txn} transaction")
+    transactionFromCustomer[chosen_teller].release() #tells the teller the transaction
+
+    # Wait for teller to finish
+    transactionDone[chosen_teller].acquire() #Program only needs to wait, will acquire once teller is done
+
+    # Leave teller
+    log(f"Customer {cid} [Teller {chosen_teller}]: leaves teller")
+    log(f"Customer {cid} []: going to door")
+    door.release() #door is able to be used 
+    log(f"Customer {cid} []: leaves the bank")
+
+    # Notify teller
+    customerLeft[chosen_teller].release() #tell the customer has left
+
+def main():
+
+    # Clear old output file in case
+    with open("output.txt", "w") as f:
+        f.write("")
+
+    # Start tellers
+    tellers = []
+    for tid in range(NumberOfTellers):
+        t = threading.Thread(target=teller_thread, args=(tid,)) # give the id to semaphore
+        t.start() #Start the process
+        tellers.append(t) #appends process
+
+    # Wait for them to finish an ordered set up
+    tellersReadyEvent.wait()
+
+    # tellers ready, tell customers to decide their actions
+    for cid in range(NumberOfCustomers):
+        txn = random.choice(["Deposit", "Withdraw"]) #randomly choose between the two and assign it
+        customerTransactions[cid] = txn #set the id equal to this on the semaphore
+        log(f"Customer {cid} []: wants to perform a {txn.lower()} transaction") #tell them terminal and file
+
+    # Starts threads for customers
+    customers = []
+    for cid in range(NumberOfCustomers):
+        c = threading.Thread(target=customer_thread, args=(cid,)) #numbers the customer
+        c.start() #start the semaphore
+        customers.append(c) #append into the list
+
+    # Wait for customers
+    for c in customers:
+        c.join()
+
+    # Waiting on tellers
+    for t in tellers:
+        t.join()
+
+    log("Bank simulation complete.") #final log message
+
+if __name__ == "__main__":
+    main()
+
