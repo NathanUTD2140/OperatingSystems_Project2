@@ -14,3 +14,6 @@ Putting door.acquire() before the going to the bank issue did indeed solve my pr
 I added a new semaphore called arrivalSem to ensure that the customer is able to go to the bank, enter the bank (if door allows), and then get in line. Door is put before arrival in case that we can have multiple people enter once per door, but we cannot have multiple entering the line at the same time. This worked well, and it prints in the order I want it to. There is a bigger issue now however, as I notice that some customers don't get served at all and some get served multiple times. This is very bad, and I will try and fix this error. I believe it has something to do with how the ids are assigned, but we will see. 
 ### November 16th 2025 9:05pm
 The problem is with assigned teller, it does not seem to properly store the customer ID. I will try and fix this by seeing how the ID is stored and making changes as needed. 
+### November 16th 2025 9:37pm
+AssignedTeller now changes to negative one after we have given the user the customer ID, as it will make sure the teller does not take in too many customers and they are used only once. The program works smoothly with this change. Time to write the final log and the final thoughts. 
+
