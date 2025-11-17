@@ -5,7 +5,6 @@ import time
 # Log system, not thread dependent unless we lock it.
 logLock = threading.Lock()
 
-
 def log(msg):
     """ Logs atomically to both the terminal and an output file. """
     with logLock:
@@ -13,9 +12,7 @@ def log(msg):
         with open("output.txt", "a") as f:  # What to write out to the file
             f.write(msg + "\n")  # message that is passed to log
 
-
 # GLOBAL CONSTANTS & SYNCHRONIZATION OBJECTS
-
 NumberOfTellers = 3
 NumberOfCustomers = 50
 customersLeft = NumberOfCustomers  ##will be decremented later as customers leave
@@ -30,13 +27,10 @@ tellersReadyLock = threading.Lock()  # Lock for the ready
 tellersReadyEvent = threading.Event()  # sets events that we will declare later on!
 
 # Synchronization Semaphores
-tellerAvailable = [threading.Semaphore(1) for _ in
-                   range(NumberOfTellers)]  # Teller availability will be set, only one instance for all tellers
-tellerWaiting = [threading.Semaphore(0) for _ in
-                 range(NumberOfTellers)]  # We will need to wait occasionally for all tellers
+tellerAvailable = [threading.Semaphore(1) for _ in range(NumberOfTellers)]  # Teller availability will be set, only one instance for all tellers
+tellerWaiting = [threading.Semaphore(0) for _ in range(NumberOfTellers)]  # We will need to wait occasionally for all tellers
 transactionFromCustomer = [threading.Semaphore(0) for _ in range(NumberOfTellers)]  # tranascation for this process
-transactionDone = [threading.Semaphore(0) for _ in
-                   range(NumberOfTellers)]  # completion of transacion, need to signal back
+transactionDone = [threading.Semaphore(0) for _ in range(NumberOfTellers)]  # completion of transacion, need to signal back
 customerLeft = [threading.Semaphore(0) for _ in range(NumberOfTellers)]  # signal for customer to leave
 
 manager = threading.Semaphore(1)  # one instance of manager
@@ -50,7 +44,7 @@ assignedTeller = [-1] * NumberOfCustomers  # will later be stored with the custo
 customerTransactions = [""] * NumberOfCustomers  # initialization of desired transaction
 
 bank_open = True  # Open bank for closing later
-arrivalSem = threading.Semaphore(1) #lets in two people at a time
+arrivalSem = threading.Semaphore(1) #arrival sempahore so that it is more similar to the sample provided
 
 def teller_thread(tid):
     global customersLeft, bank_open, tellersReady
@@ -83,12 +77,13 @@ def teller_thread(tid):
         with queueLock:
             cid = None
             for i in range(NumberOfCustomers):
-                if assignedTeller[i] == tid:  # if a teller is assigned, break out
-                    cid = i  # marks the customer ID
+                if assignedTeller[i] == tid:  # if a teller is assigned, break the loop
+                    cid = i
+                    assignedTeller[i] = -1  # Fixs the assignment that was messing with me earlier
                     break
 
         if cid is None:
-            continue  ##effectively an infinite loop
+            continue  # effectively an infinite loop
 
         # Ask for transaction once someone is successful
         log(f"Teller {tid} [Customer {cid}]: asks for transaction")
@@ -116,7 +111,7 @@ def teller_thread(tid):
 
         # Tell the customer it's done
         log(f"Teller {tid} [Customer {cid}]: informs customer transaction is complete")
-        transactionDone[tid].release()  # releases it back
+        transactionDone[tid].release() # releases it back
 
         # Wait for customer to leave
         customerLeft[tid].acquire()  # waits for this to be true to signal if teller is free
@@ -129,30 +124,29 @@ def teller_thread(tid):
             if customersLeft == 0:  # once we reach 0, we are done for the day
                 bank_open = False  # Bank close
                 for t in tellerWaiting:
-                    t.release()  # release all teller semaphores once done
+                    t.release() # release all teller semaphores once done
 
         if not bank_open:
-            break  # otherwise just break out
+            break # otherwise just break out
 
 
-# Customer thread
 def customer_thread(cid):
     txn = customerTransactions[cid]
 
     # Customer arrival delay
     time.sleep(random.uniform(0.0, 0.1))
 
-    door.acquire()  # swapped order to make it so these three happen like the sample
-    arrivalSem.acquire()  # Make sure that it is going in correct order
+    door.acquire() # swapped order to make it so these three happen like the sample
+    arrivalSem.acquire() #Make sure that it is going in correct order
     # 3 steop intro like in sample
     log(f"Customer {cid} []: going to bank.")
     log(f"Customer {cid} []: entering bank.")
     log(f"Customer {cid} []: getting in line.")
-    arrivalSem.release()  # Release both semas so more can come in
-    door.release()  # door is after in case 2 customers come in at the same time, b
+    arrivalSem.release() # Release both semas so more can come in
+    door.release() #door is after in case 2 customers come in at the same time, b
 
     with queueLock:
-        customerQueue.append(cid)  # Add in the customer id to queue
+        customerQueue.append(cid) # Add in the customer id to queue
 
     chosen_teller = None
 
@@ -168,7 +162,7 @@ def customer_thread(cid):
             if chosen_teller is not None:
                 break
 
-        time.sleep(0.001)  # rest between
+        time.sleep(0.001) # rest between
 
     # Logging the teller
     log(f"Customer {cid} []: selecting a teller.")
@@ -183,16 +177,16 @@ def customer_thread(cid):
     transactionFromCustomer[chosen_teller].release()  # tells the teller the transaction
 
     # Wait for teller to finish
-    transactionDone[chosen_teller].acquire()  # Program only needs to wait, will acquire once teller is done
+    transactionDone[chosen_teller].acquire() # Program only needs to wait, will acquire once teller is done
 
     # Leave teller
     log(f"Customer {cid} [Teller {chosen_teller}]: leaves teller")
     log(f"Customer {cid} []: going to door")
-    door.release()  # door is able to be used
+    door.release() # door is able to be used
     log(f"Customer {cid} []: leaves the bank")
 
     # Notify teller
-    customerLeft[chosen_teller].release()  # tell the customer has left
+    customerLeft[chosen_teller].release() # tell the customer has left
 
 
 def main():
@@ -207,7 +201,7 @@ def main():
         t.start()  # Start the process
         tellers.append(t)  # appends process
 
-    # Wait for them to finish an ordered set up
+    # Wait for them to finish ordered set up
     tellersReadyEvent.wait()
 
     # tellers ready, tell customers to decide their actions
@@ -227,12 +221,11 @@ def main():
     for c in customers:
         c.join()
 
-    # Waiting on tellers
+    # Wait for tellers
     for t in tellers:
         t.join()
 
-    log("Bank simulation complete.")  # final log message
-
+    log("Banks closed, Come again tomorrow.") # final log message
 
 if __name__ == "__main__":
     main()
